@@ -1,5 +1,4 @@
 require('dotenv').config();
-require('express-async-errors');
 
 const express    = require('express');
 const cors       = require('cors');
@@ -9,14 +8,13 @@ const { Server } = require('socket.io');
 const connectDB  = require('./config/db');
 const authRoutes     = require('./routes/auth');
 const supplierRoutes = require('./routes/suppliers');
-const { errorHandler }  = require('./middleware/errorHandler');
-const { apiLimiter }    = require('./middleware/rateLimiter');
-const { startScheduler } = require('./services/alertService');
+const { errorHandler }   = require('./middleware/errorHandler');
+const { apiLimiter }     = require('./middleware/rateLimiter');
 
 const app    = express();
 const server = http.createServer(app);
 
-// ─── Socket.io Setup ──────────────────────────────────
+// ── Socket.io ─────────────────────────────────────────
 const io = new Server(server, {
   cors: {
     origin: [
@@ -34,16 +32,15 @@ io.on('connection', (socket) => {
   });
 });
 
-// Make io accessible in controllers
 app.set('io', io);
 
-// ─── Security ─────────────────────────────────────────
+// ── Security ──────────────────────────────────────────
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: false,
 }));
 
-// ─── CORS ─────────────────────────────────────────────
+// ── CORS ──────────────────────────────────────────────
 app.use(cors({
   origin: [
     'http://localhost:5173',
@@ -58,35 +55,40 @@ app.use(cors({
 
 app.options('*', cors());
 
-
-// ─── Body Parser ──────────────────────────────────────
+// ── Body Parser ───────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
 
-// ─── Rate Limiting ────────────────────────────────────
+// ── Rate Limiting ─────────────────────────────────────
 app.use('/api', apiLimiter);
 
-// ─── Health Check ─────────────────────────────────────
+// ── Health Check ──────────────────────────────────────
 app.get('/', (req, res) => {
   res.json({ message: '✅ SupplyPulse API is running' });
 });
 
-// ─── Routes ───────────────────────────────────────────
+// ── Routes ────────────────────────────────────────────
 app.use('/api/auth',      authRoutes);
 app.use('/api/suppliers', supplierRoutes);
 
-// ─── Error Handler ────────────────────────────────────
+// ── Error Handler ─────────────────────────────────────
 app.use(errorHandler);
 
-// ─── Start Server ─────────────────────────────────────
+// ── Start Server ──────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 
-connectDB().then(() => {
-  server.listen(PORT, () => {
-    console.log(`🚀 Server running on http://localhost:${PORT}`);
+// Only start scheduler in non-serverless environment
+const isVercel = process.env.VERCEL === '1';
 
-    // Start auto-refresh scheduler
+connectDB().then(() => {
+  if (!isVercel) {
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on http://localhost:${PORT}`);
+    });
+
+    // Start scheduler only locally
+    const { startScheduler } = require('./services/alertService');
     startScheduler(io);
-  });
+  }
 });
 
-module.exports = { app, io };
+module.exports = app;
