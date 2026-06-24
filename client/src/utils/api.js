@@ -1,13 +1,12 @@
 import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL ||
-                 'http://localhost:5000/api';
+                 'https://supplypulse-server.vercel.app/api';
 
 const api = axios.create({
   baseURL: BASE_URL,
 });
 
-// Attach token to every request
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -16,7 +15,6 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Handle token expiry globally
 api.interceptors.response.use(
   (response) => response,
   (error) => {

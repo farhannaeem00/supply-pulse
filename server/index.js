@@ -49,6 +49,7 @@ app.use(cors({
     'http://localhost:5173',
     'http://localhost:3000',
     process.env.CLIENT_URL,
+    'https://supplypulseclient.vercel.app',
   ],
   methods:        ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -56,6 +57,7 @@ app.use(cors({
 }));
 
 app.options('*', cors());
+
 
 // ─── Body Parser ──────────────────────────────────────
 app.use(express.json({ limit: '10kb' }));
