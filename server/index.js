@@ -1,38 +1,15 @@
 require('dotenv').config();
 
-const express    = require('express');
-const cors       = require('cors');
-const helmet     = require('helmet');
-const http       = require('http');
-const { Server } = require('socket.io');
-const connectDB  = require('./config/db');
+const express  = require('express');
+const cors     = require('cors');
+const helmet   = require('helmet');
+const connectDB = require('./config/db');
 const authRoutes     = require('./routes/auth');
 const supplierRoutes = require('./routes/suppliers');
-const { errorHandler }   = require('./middleware/errorHandler');
-const { apiLimiter }     = require('./middleware/rateLimiter');
+const { errorHandler } = require('./middleware/errorHandler');
+const { apiLimiter }   = require('./middleware/rateLimiter');
 
-const app    = express();
-const server = http.createServer(app);
-
-// ── Socket.io ─────────────────────────────────────────
-const io = new Server(server, {
-  cors: {
-    origin: [
-      'http://localhost:5173',
-      process.env.CLIENT_URL,
-    ],
-    methods: ['GET', 'POST'],
-  },
-});
-
-io.on('connection', (socket) => {
-  console.log(`⚡ Client connected: ${socket.id}`);
-  socket.on('disconnect', () => {
-    console.log(`❌ Client disconnected: ${socket.id}`);
-  });
-});
-
-app.set('io', io);
+const app = express();
 
 // ── Security ──────────────────────────────────────────
 app.use(helmet({
@@ -73,22 +50,43 @@ app.use('/api/suppliers', supplierRoutes);
 // ── Error Handler ─────────────────────────────────────
 app.use(errorHandler);
 
-// ── Start Server ──────────────────────────────────────
-const PORT = process.env.PORT || 5000;
+// ── Local Dev Only ────────────────────────────────────
+if (process.env.NODE_ENV !== 'production') {
+  const http       = require('http');
+  const { Server } = require('socket.io');
 
-// Only start scheduler in non-serverless environment
-const isVercel = process.env.VERCEL === '1';
+  const server = http.createServer(app);
+  const io     = new Server(server, {
+    cors: {
+      origin: ['http://localhost:5173'],
+      methods: ['GET', 'POST'],
+    },
+  });
 
-connectDB().then(() => {
-  if (!isVercel) {
+  app.set('io', io);
+
+  io.on('connection', (socket) => {
+    console.log(`⚡ Client connected: ${socket.id}`);
+    socket.on('disconnect', () => {
+      console.log(`❌ Client disconnected: ${socket.id}`);
+    });
+  });
+
+  const PORT = process.env.PORT || 5000;
+
+  connectDB().then(() => {
     server.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
     });
 
-    // Start scheduler only locally
     const { startScheduler } = require('./services/alertService');
     startScheduler(io);
-  }
-});
+  });
 
+} else {
+  // ── Production (Vercel) ──────────────────────────────
+  connectDB();
+}
+
+// ── MUST export app for Vercel ────────────────────────
 module.exports = app;

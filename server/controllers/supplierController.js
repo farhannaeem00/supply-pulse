@@ -34,7 +34,7 @@ const addSupplier = async (req, res) => {
   });
 
   // Emit real-time update
-  io.emit('supplier:added', supplier);
+  if (io) io.emit('supplier:added', supplier);
 
   res.status(201).json({
     success: true,
@@ -99,7 +99,7 @@ const updateSupplier = async (req, res) => {
 
   // Emit real-time update
   const io = req.app.get('io');
-  io.emit('supplier:updated', supplier);
+  if (io) io.emit('supplier:updated', supplier);
 
   res.status(200).json({
     success: true,
@@ -123,7 +123,7 @@ const deleteSupplier = async (req, res) => {
 
   // Emit real-time update
   const io = req.app.get('io');
-  io.emit('supplier:deleted', { id: req.params.id });
+  if (io) io.emit('supplier:deleted', { id: req.params.id });
 
   res.status(200).json({
     success: true,
